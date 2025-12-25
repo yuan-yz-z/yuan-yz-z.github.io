@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Scoreboard Display</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color-b: #FFFACD; /* 淡黄色 LemonChiffon */
+            --text-color-c: #98FB98; /* 淡绿色 PaleGreen */
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            font-family: 'Orbitron', sans-serif;
+            box-sizing: border-box;
+        }
+
+        /* 主容器 */
+        #container {
+            position: absolute;
+            top: 5%;
+            left: 5%;
+            width: 90%;
+            height: 90%;
+            display: flex;
+        }
+
+        /* 通用盒子样式 */
+        .box {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            white-space: nowrap;
+            line-height: 1;
+            position: relative;
+        }
+        
+        .content {
+            display: block;
+            text-align: center;
+            transform-origin: center center;
+        }
+
+        .group-b { color: var(--text-color-b); }
+        .group-c { color: var(--text-color-c); }
+
+        /* ========= 横屏布局 (Landscape) ========= */
+        @media (orientation: landscape) {
+            #container {
+                flex-direction: row;
+            }
+
+            .left-panel, .right-panel {
+                width: 50%;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .row-1 { height: 25%; }
+            .row-2 { height: 35%; }
+            .row-3 { height: 30%; }
+        }
+
+        /* ========= 竖屏布局 (Portrait) ========= */
+        @media (orientation: portrait) {
+            #container {
+                flex-direction: column;
+            }
+
+            .left-panel, .right-panel {
+                width: 100%;
+                height: 50%;
+                display: flex;
+                flex-direction: column;
+            }
+
+            /* 重新分配内部高度以符合比例 10:20:15 */
+            .b1-container, .c1-container { height: 22.22%; }
+            .b2-container, .c2-container { height: 44.44%; }
+            .b3-container, .c3-container { height: 33.33%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <div class="left-panel">
+            <div class="box row-1 b1-container group-b"><span id="b1" class="content">-</span></div>
+            <div class="box row-2 b2-container group-b"><span id="b2" class="content">-</span></div>
+            <div class="box row-3 b3-container group-b"><span id="b3" class="content">-</span></div>
+        </div>
+
+        <div class="right-panel">
+            <div class="box row-1 c1-container group-c"><span id="c1" class="content">-</span></div>
+            <div class="box row-2 c2-container group-c"><span id="c2" class="content">-</span></div>
+            <div class="box row-3 c3-container group-c"><span id="c3" class="content">-</span></div>
+        </div>
+    </div>
+
+    <script>
+        const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1X7W2g_AC67_mifX2c8ifru_otA0_4Ba3IWlP2W6rl5w/export?format=csv&gid=1761496667';
+
+        function fitText(el) {
+            if (!el) return;
+            const text = el.innerText;
+            if (!text || text === '-') {
+                el.style.fontSize = '10vh';
+                return;
+            }
+
+            const container = el.parentElement;
+            const isPortrait = window.matchMedia("(orientation: portrait)").matches;
+            
+            let optimal = 10;
+            el.style.fontSize = '1px';
+            
+            const pW = container.clientWidth;
+            const pH = container.clientHeight;
+
+            let low = 1, high = Math.min(pH, pW * 2);
+            
+            while (low <= high) {
+                let mid = (low + high) / 2;
+                el.style.fontSize = mid + 'px';
+                
+                let fits = false;
+                if (isPortrait) {
+                    if (el.scrollWidth <= pW && el.scrollHeight <= pH) fits = true;
+                } else {
+                    if (el.scrollHeight <= pH * 0.95 && el.scrollWidth <= pW) fits = true;
+                }
+
+                if (fits) {
+                    optimal = mid;
+                    low = mid + 1;
+                } else {
+                    high = mid - 1;
+                }
+            }
+            el.style.fontSize = optimal + 'px';
+        }
+
+        function resizeAll() {
+            ['b1', 'b2', 'b3', 'c1', 'c2', 'c3'].forEach(id => {
+                fitText(document.getElementById(id));
+            });
+        }
+
+        function parseCSV(text) {
+            const rows = text.trim().split(/\r?\n/);
+            try {
+                const data = rows.map(row => row.split(','));
+                const getCell = (r, c) => (data[r] && data[r][c]) ? data[r][c].trim() : '-';
+                return {
+                    b1: getCell(0, 1), b2: getCell(1, 1), b3: getCell(2, 1),
+                    c1: getCell(0, 2), c2: getCell(1, 2), c3: getCell(2, 2)
+                };
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function fetchData() {
+            try {
+                const response = await fetch(SHEET_CSV_URL + '&t=' + Date.now());
+                if (!response.ok) throw new Error("Network error");
+                const text = await response.text();
+                const newData = parseCSV(text);
+                if(!newData) return;
+                
+                let hasChange = false;
+                for (let key in newData) {
+                    const el = document.getElementById(key);
+                    if (el && el.innerText !== newData[key]) {
+                        el.innerText = newData[key] || '-';
+                        hasChange = true;
+                    }
+                }
+                if (hasChange) resizeAll();
+            } catch (error) {
+                console.log("Fetching...");
+            }
+        }
+
+        window.addEventListener('resize', resizeAll);
+        window.addEventListener('orientationchange', () => setTimeout(resizeAll, 100));
+        
+        fetchData();
+        setInterval(fetchData, 500);
+    </script>
+</body>
+</html>
