@@ -3,91 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Scoreboard Display</title>
+    <title>Scoreboard Display - Professional</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
     <style>
         :root {
+            /* =========================================
+               【参数配置区】
+               ========================================= */
+            
+            /* 1. 基础颜色 */
             --bg-color: #000000;
-            --text-color-b: #FFFACD; /* 淡黄色 LemonChiffon */
-            --text-color-c: #98FB98; /* 淡绿色 PaleGreen */
+            --text-color-b: #FFFACD; /* B组主颜色 (淡黄) */
+            --text-color-c: #98FB98; /* C组主颜色 (淡绿) */
+
+            /* 2. 内容深浅 (1.0 为最亮, 数值越小越浅/暗) */
+            --row3-opacity: 0.5;      /* 专门调整 b3, c3 的深浅 */
+
+            /* 3. 横屏布局比例 (三行高度总和建议等于 100) */
+            --ls-row1: 25; 
+            --ls-row2: 55;
+            --ls-row3: 20;
+
+            /* 4. 竖屏布局比例 (每组内三行高度总和建议等于 100) */
+            --pt-row1: 25;
+            --pt-row2: 55;
+            --pt-row3: 20;
+            
+            /* ========================================= */
         }
 
         body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
+            margin: 0; padding: 0; width: 100%; height: 100%;
             background-color: var(--bg-color);
             overflow: hidden;
             font-family: 'Orbitron', sans-serif;
             box-sizing: border-box;
         }
 
-        /* 主容器 */
         #container {
             position: absolute;
-            top: 5%;
-            left: 5%;
-            width: 90%;
-            height: 90%;
+            top: 5%; left: 5%; width: 90%; height: 90%;
             display: flex;
         }
 
-        /* 通用盒子样式 */
         .box {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-            white-space: nowrap;
-            line-height: 1;
+            display: flex; justify-content: center; align-items: center;
+            overflow: hidden; white-space: nowrap; line-height: 1;
             position: relative;
         }
         
-        .content {
-            display: block;
-            text-align: center;
-            transform-origin: center center;
-        }
-
+        .content { display: block; text-align: center; transform-origin: center center; }
         .group-b { color: var(--text-color-b); }
         .group-c { color: var(--text-color-c); }
 
+        /* 应用深浅调整 */
+        .b3-container, .c3-container { opacity: var(--row3-opacity); }
+
         /* ========= 横屏布局 (Landscape) ========= */
         @media (orientation: landscape) {
-            #container {
-                flex-direction: row;
-            }
-
-            .left-panel, .right-panel {
-                width: 50%;
-                height: 100%;
-                display: flex;
-                flex-direction: column;
-            }
-
-            .row-1 { height: 25%; }
-            .row-2 { height: 35%; }
-            .row-3 { height: 30%; }
+            #container { flex-direction: row; }
+            .left-panel, .right-panel { width: 50%; height: 100%; display: flex; flex-direction: column; }
+            .row-1 { height: calc(var(--ls-row1) * 1%); }
+            .row-2 { height: calc(var(--ls-row2) * 1%); }
+            .row-3 { height: calc(var(--ls-row3) * 1%); }
         }
 
         /* ========= 竖屏布局 (Portrait) ========= */
         @media (orientation: portrait) {
-            #container {
-                flex-direction: column;
-            }
-
-            .left-panel, .right-panel {
-                width: 100%;
-                height: 50%;
-                display: flex;
-                flex-direction: column;
-            }
-
-            /* 重新分配内部高度以符合比例 10:20:15 */
-            .b1-container, .c1-container { height: 22.22%; }
-            .b2-container, .c2-container { height: 44.44%; }
-            .b3-container, .c3-container { height: 33.33%; }
+            #container { flex-direction: column; }
+            .left-panel, .right-panel { width: 100%; height: 50%; display: flex; flex-direction: column; }
+            .b1-container, .c1-container { height: calc(var(--pt-row1) * 1%); }
+            .b2-container, .c2-container { height: calc(var(--pt-row2) * 1%); }
+            .b3-container, .c3-container { height: calc(var(--pt-row3) * 1%); }
         }
     </style>
 </head>
@@ -110,6 +97,7 @@
     <script>
         const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1X7W2g_AC67_mifX2c8ifru_otA0_4Ba3IWlP2W6rl5w/export?format=csv&gid=1761496667';
 
+        // 自动调整字体大小，使其完美填充容器
         function fitText(el) {
             if (!el) return;
             const text = el.innerText;
@@ -134,11 +122,8 @@
                 el.style.fontSize = mid + 'px';
                 
                 let fits = false;
-                if (isPortrait) {
-                    if (el.scrollWidth <= pW && el.scrollHeight <= pH) fits = true;
-                } else {
-                    if (el.scrollHeight <= pH * 0.95 && el.scrollWidth <= pW) fits = true;
-                }
+                // 留出 5% 的边距防止贴边
+                if (el.scrollHeight <= pH * 0.95 && el.scrollWidth <= pW * 0.95) fits = true;
 
                 if (fits) {
                     optimal = mid;
@@ -159,15 +144,14 @@
         function parseCSV(text) {
             const rows = text.trim().split(/\r?\n/);
             try {
+                // 处理可能的逗号分割
                 const data = rows.map(row => row.split(','));
                 const getCell = (r, c) => (data[r] && data[r][c]) ? data[r][c].trim() : '-';
                 return {
                     b1: getCell(0, 1), b2: getCell(1, 1), b3: getCell(2, 1),
                     c1: getCell(0, 2), c2: getCell(1, 2), c3: getCell(2, 2)
                 };
-            } catch (e) {
-                return null;
-            }
+            } catch (e) { return null; }
         }
 
         async function fetchData() {
@@ -186,16 +170,19 @@
                         hasChange = true;
                     }
                 }
+                // 只有在数据变化时才重新调整字号，节省性能
                 if (hasChange) resizeAll();
             } catch (error) {
-                console.log("Fetching...");
+                console.log("Fetching data...");
             }
         }
 
         window.addEventListener('resize', resizeAll);
-        window.addEventListener('orientationchange', () => setTimeout(resizeAll, 100));
+        window.addEventListener('orientationchange', () => setTimeout(resizeAll, 200));
         
+        // 初始加载
         fetchData();
+        // 每 500ms 轮询一次新数据
         setInterval(fetchData, 500);
     </script>
 </body>
